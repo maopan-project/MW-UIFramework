@@ -1,0 +1,11 @@
+dist
+
+DBCache
+Pictures
+AutoBackup
+.mw
+NAVDATA.bin
+
+tsconfig.json
+
+**/JavaScripts/ui-generate/**/*.meta
