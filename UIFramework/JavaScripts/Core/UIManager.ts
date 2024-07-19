@@ -1,14 +1,45 @@
 import UIController from "./UIController";
-import { TController, UILayer } from "./UITypes";
+import { TController, UILayer, UILife } from "./UITypes";
 
 export default class UIManager {
-    private static _uiList: Map<string, TController> = new Map();
+    private static _ins: UIManager = null;
 
-    private static _layerList: Map<number, TController[]> = new Map();
+    private constructor() {
+        setInterval(() => {
+            this.update();
+        }, 1000);
+    }
 
-    private static _uiCloseList: Set<TController> = new Set();
+    public static get ins() {
+        if (!this._ins) {
+            this._ins = new UIManager();
+        }
 
-    public static open<T extends UIScript, V extends UIController<T>>(cls: { new(): V, prototype: V }, param: Parameters<typeof cls.prototype.open>) {
+        return this._ins;
+    }
+
+    private _uiList: Map<string, TController> = new Map();
+
+    private _layerList: Map<number, TController[]> = new Map();
+
+    private _layerContent: Map<number, mw.Canvas> = new Map();
+
+    private _uiCloseList: Set<TController> = new Set();
+
+    /**
+     * 预加载（编辑器暂时用不到）
+     */
+    public load() {
+
+    }
+
+    /**
+     * 打开一个UI控制器
+     * @param cls UI控制类
+     * @param params UI打开需要携带的参数
+     * @returns 
+     */
+    public open<T extends TController>(cls: { new(): T, prototype: T }, ...params: Parameters<typeof cls.prototype['onOpen']>) {
         let uiIns = this._uiList.get(cls.name);
         if (uiIns) {
             if (uiIns.panel.visible) {
@@ -16,32 +47,77 @@ export default class UIManager {
                 return;
             }
 
-            uiIns.onOpen(param);
+            uiIns.open(...params);
         } else {
             let controller = new cls();
-            this._uiList.set(cls.name, controller);
 
-            controller.onCreate(param);
-            controller.onOpen(param);
+            let panel = UIService.create(controller.panelClass);
+            if (!panel) {
+                console.log(`Panel --- ${cls.name} create fail`);
+                return;
+            }
+
+            let content = this.getContent(controller.layer);
+            content.addChild(panel.uiObject);
+            controller.panel = panel;
+
+            this._uiList.set(cls.name, controller);
+            let arr = this._layerList.get(controller.layer) ?? [];
+            arr.push(controller);
+            this._layerList.set(controller.layer, arr);
+
+            // 这里应该有资源加载部分，但是编辑器UI默认都是是加载过的
+            controller.onCreate(...params);
+            controller.open(...params);
         }
     }
 
-    public static close<T extends UIScript, V extends UIController<T>>(controller: { new(): V }) {
-        let c = this._uiList.get(controller.name);
+    /**
+     * 关闭一个UI控制器
+     * @param controller 控制器类或者控制器实体对象
+     */
+    public close<T extends TController>(controller: { new(): T } | T) {
+        let name = typeof controller === 'function' ? controller.name : controller['constructor'].name;
+        let ctrl = this._uiList.get(name);
+        if (!ctrl) {
+            console.log('Panel not exists');
+            return;
+        }
+
+        let index = (this._layerList.get(ctrl.layer) ?? []).findIndex(val => val === ctrl);
+        if (index === -1) {
+            console.log('Panel not display');
+            return;
+        }
+
+        this._layerList.get(ctrl.layer).splice(index, 1);
+        ctrl.close();
+
+        if (ctrl.life === UILife.ONE) {
+            this._uiList.delete(name);
+            ctrl.destroy();
+        } else if (ctrl.life === UILife.SOMETIME) {
+            this._uiCloseList.add(ctrl);
+        }
     }
 
-    public static queryPanelByControl<T extends UIScript, V extends UIController<T>>(controller: { new(): V }): T {
+    /**
+     * 获取一个UI控制器
+     * @param controller 控制器类
+     * @returns 控制器实体
+     */
+    public queryPanelByControl<T extends TController>(controller: { new(): T }): T {
         let c = this._uiList.get(controller.name);
         if (c) {
             if (c.panel.visible) {
-                return c.panel as T;
+                return c as T;
             }
         }
 
         return null;
     }
 
-    static update() {
+    private update() {
         if (this._uiCloseList.size > 0) {
             let ctrlPassed: TController[] = [];
             let time = Math.floor(Date.now() / 1000);
@@ -58,5 +134,16 @@ export default class UIManager {
                 ctrl.destroy();
             }
         }
+    }
+
+    private getContent(layer: UILayer) {
+        let content = this._layerContent.get(layer);
+        if (!content) {
+            content = Canvas.newObject(UIService.canvas, 'layer_' + layer);
+            content.constraints.constraintHorizontal
+            this._layerContent.set(layer, content);
+        }
+
+        return content;
     }
 }

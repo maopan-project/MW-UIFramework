@@ -1,4 +1,6 @@
-﻿
+﻿import UIManager from "./Core/UIManager";
+import LobbyUI from "./UI/LobbyUI";
+
 @Component
 export default class GameMain extends Script {
 
@@ -8,7 +10,9 @@ export default class GameMain extends Script {
 
 
         if (SystemUtil.isClient()) {
-            
+            InputUtil.onKeyDown(Keys.Q, () => {
+                UIManager.ins.open(LobbyUI, 1);
+            });
         }
 
         if (SystemUtil.isServer()) {
