@@ -1,10 +1,17 @@
 import UIController from "./UIController";
 
 export enum UILayer {
+    /**基层 */
     BASE,
+    /**摇杆控制 */
     JOY_STICK,
+    /**弹窗 */
     POPUP,
+    /**抬头显示 */
     HUD,
+    /**引导层 */
+    Guide,
+    /**提示 */
     ALERT
 }
 
@@ -31,6 +38,7 @@ export enum UILife {
     /**存在一定时间销毁 */
     SOMETIME,
 }
+
 
 export type TClass<T> = new (...params: any[]) => T;
 
